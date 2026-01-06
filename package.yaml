@@ -119,6 +119,8 @@ library:
   - DTS.Prover.Wani.BackwardWithRules
   - DTS.Prover.Wani.Arrowterm
   - DTS.Prover.Wani.Prove
+  - DTS.Prover.Oracle.Oracle
+  - DTS.Prover.Oracle.OracleUtils
 
 executables:
   lightblue:
