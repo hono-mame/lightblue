@@ -385,7 +385,8 @@ lightblueMain (Options lang commands style proverName filepath beamW nParse nTyp
           handle = S.stdout
           prover = NLI.getProver proverName $ QT.defaultProofSearchSetting {
             QT.maxDepth = Just maxDepth, 
-            QT.maxTime = Just maxTime
+            QT.maxTime = Just maxTime,
+            QT.oracle = maybeOracle
             }
       case style of
         I.EXPRESS -> do
