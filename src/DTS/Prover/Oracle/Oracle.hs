@@ -17,8 +17,9 @@ oracle (childName, parentName) = do
 
     embMap <- loadWordEmbeddings embPath
 
-    let pResult = M.lookup parentName embMap
-    let cResult = M.lookup childName embMap
+    let stripTilde = T.filter (/= '~')
+    let pResult = M.lookup (stripTilde parentName) embMap
+    let cResult = M.lookup (stripTilde childName)  embMap
 
     case (pResult, cResult) of
         (Just pEmbs, Just cEmbs) -> do
@@ -38,8 +39,9 @@ oracleBuilder = do
     let alpha   = 0.1
     embMap <- loadWordEmbeddings embPath
     return $ \childName parentName ->
-        let pResult = M.lookup parentName embMap
-            cResult = M.lookup childName embMap
+        let stripTilde = T.filter (/= '~')
+            pResult = M.lookup (stripTilde parentName) embMap
+            cResult = M.lookup (stripTilde childName)  embMap
         in case (pResult, cResult) of
             (Just pEmbs, Just cEmbs) -> 
                 let allScores = [ calcPScore alpha pEmb cEmb | pEmb <- pEmbs, cEmb <- cEmbs ]
