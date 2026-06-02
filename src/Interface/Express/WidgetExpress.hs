@@ -96,7 +96,7 @@ widgetizeDepth setting depth node = case Parser.CCG.daughters node of
                         <td>
                           <math xmlns='http://www.w3.org/1998/Math/MathML'>^{widgetizeWith setting $ sem node}
             <td valign="baseline">
-              <span>LEX
+              <span style="font-size:0.8em;">#{Parser.CCG.source node}
         |]
     dtrs -> do
       -- 子の数*２
@@ -177,15 +177,13 @@ instance Widgetizable Cat where
                            <msub>
                              <mi>S
                              <mstyle color='Purple'>
-                               <mtable columnalign='left'>
+                               <mtable columnalign='left' style="text-align:left">
                                  <mtr class="sf">
-                                   <mtd>^{widgetize pos}
+                                   <mtd columnalign='left' style="text-align:left">^{widgetize pos}
                                  <mtr class="sf">
-                                   <mtd>
-                                     <mpadded height='-0.5em'>^{widgetize conj}
+                                   <mtd columnalign='left' style="text-align:left">^{widgetize conj}
                                  <mtr class="sf">
-                                   <mtd>
-                                     <mpadded height='-0.5em'>^{widgetize pm}
+                                   <mtd columnalign='left' style="text-align:left">^{widgetize pm}
                                  |]
     NP []       -> [whamlet|<mi>NP
                            |]
