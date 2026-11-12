@@ -46,7 +46,7 @@ import qualified JSeM as JSeM                         --jsem
 import qualified ML.Exp.Classification.Bounded as NLP --nlp-tools
 import qualified DTS.Prover.Oracle.Oracle as Oracle
 
-data Options = Options Lang Command I.Style NLI.ProverName FilePath Int Int Int Int Int Int Bool Bool Bool Bool (Maybe Int) Bool Bool Bool (Maybe ExpressBrowser) (Maybe LexicalPos) Bool (Maybe FilePath)
+data Options = Options Lang Command I.Style NLI.ProverName FilePath Int Int Int Int Int Int Bool Bool Bool Bool (Maybe Int) Bool Bool Bool (Maybe ExpressBrowser) (Maybe LexicalPos) Bool Oracle.OracleMode (Maybe FilePath) (Maybe FilePath) (Maybe FilePath) Float
 
 data Command =
   Parse I.ParseOutput
@@ -83,6 +83,16 @@ expressBrowserReader = eitherReader $ \s ->
     "chrome"  -> Right BrowserChrome
     "firefox" -> Right BrowserFirefox
     _         -> Left "Expected one of: default|chrome|firefox"
+
+oracleModeReader :: ReadM Oracle.OracleMode
+oracleModeReader = eitherReader $ \s ->
+  case map toLower s of
+    "hec"      -> Right Oracle.OracleHEC
+    "oov-hec"  -> Right Oracle.OracleOovHEC
+    "oov-mlp"  -> Right Oracle.OracleOovMLP
+    "hec-only" -> Right Oracle.OracleStandaloneHEC
+    "mlp-only" -> Right Oracle.OracleStandaloneMLP
+    _          -> Left "Expected one of: hec|oov-hec|oov-mlp|hec-only|mlp-only"
 
 -- <$> :: (a -> b) -> Parser a -> Parser b
 -- <*> :: Parser (a -> b) -> Parser a -> Parser b
@@ -258,10 +268,29 @@ optionParser =
     <*> switch 
       ( long "enableOracle"
       <> help "Enable Oracle if specified" )
+    <*> option oracleModeReader
+      ( long "oracleMode"
+      <> metavar "hec|oov-hec|oov-mlp|hec-only|mlp-only"
+      <> value Oracle.OracleHEC
+      <> help "Select Oracle model mode (default: hec)" )
     <*> optional (strOption
       ( long "oracleEmbedding"
       <> metavar "FILEPATH"
       <> help "Specify path to Oracle Embedding.csv (default: $LIGHTBLUE/data/Embedding.csv)" ))
+    <*> optional (strOption
+      ( long "oracleOovEmbedding"
+      <> metavar "FILEPATH"
+      <> help "Specify path to OOV embedding CSV (default: $LIGHTBLUE/data/Embedding_OOV_HEC.csv or Embedding_OOV_MLP.csv)" ))
+    <*> optional (strOption
+      ( long "oracleMlpWeights"
+      <> metavar "FILEPATH"
+      <> help "Specify path to MLP head weights CSV (default: $LIGHTBLUE/data/MLP_Head_Weights.csv)" ))
+    <*> option auto
+      ( long "oracleThreshold"
+      <> metavar "FLOAT"
+      <> showDefault
+      <> value 0.5
+      <> help "Specify probability threshold for Oracle entailment judgment" )
 
 parseOptionParser :: Parser Command
 parseOptionParser = Parse
@@ -303,7 +332,7 @@ main = customExecParser p opts >>= lightblueMain
         p = prefs showHelpOnEmpty
 
 lightblueMain :: Options -> IO ()
-lightblueMain (Options lang commands style proverName filepath beamW nParse nTypeCheck nProof maxDepth maxTime noTypeCheck noInference ifTime verbose mDepth noShowCat noShowSem leafVertical mExpressBrowser mLexPos enableOracle mOracleEmbedding) = do
+lightblueMain (Options lang commands style proverName filepath beamW nParse nTypeCheck nProof maxDepth maxTime noTypeCheck noInference ifTime verbose mDepth noShowCat noShowSem leafVertical mExpressBrowser mLexPos enableOracle oracleMode mOracleEmbedding mOracleOovEmbedding mOracleMlpWeights oracleThresholdVal) = do
   start <- Time.getCurrentTime
   langOptions <- case lang of
                    JP morphaName filterName -> do
@@ -330,12 +359,19 @@ lightblueMain (Options lang commands style proverName filepath beamW nParse nTyp
      then S.hPutStrLn S.stderr $ "Total Execution Time: " ++ (show $ Time.diffUTCTime stop start)
      else return ()
   where
+    oracleCfg = Oracle.OracleConfig
+      { Oracle.ocMode          = oracleMode
+      , Oracle.ocEmbeddingPath = mOracleEmbedding
+      , Oracle.ocOovEmbPath    = mOracleOovEmbedding
+      , Oracle.ocMlpWeightPath = mOracleMlpWeights
+      , Oracle.ocThreshold     = oracleThresholdVal
+      }
     -- |
     -- | Parse command
     -- |
     lightblueMainLocal (Parse output) parseSetting contents = do
       maybeOracle <- if enableOracle
-                then Just <$> Oracle.oracleBuilder mOracleEmbedding
+                then Just <$> Oracle.oracleBuilderWithConfig oracleCfg
                 else return Nothing
       let handle = S.stdout
           prover = NLI.getProver proverName $ QT.defaultProofSearchSetting {
@@ -377,7 +413,7 @@ lightblueMain (Options lang commands style proverName filepath beamW nParse nTyp
     -- 
     lightblueMainLocal (JSeM jsemID nSample) parseSetting contents = do
       maybeOracle <- if enableOracle
-                then Just <$> Oracle.oracleBuilder mOracleEmbedding
+                then Just <$> Oracle.oracleBuilderWithConfig oracleCfg
                 else return Nothing
       parsedJSeM <- J.xml2jsemData $ T.toStrict contents
       let parsedJSeM'
